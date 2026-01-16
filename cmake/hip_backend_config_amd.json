@@ -1,0 +1,47 @@
+{
+    "name": "AMD HIP",
+    "description": "AMD HIP backend configuration for ROCm",
+    
+    "runtime": {
+        "default_library": "libamdhip64.so",
+        "library_search_paths": [
+            "/opt/rocm/lib",
+            "/opt/rocm/hip/lib"
+        ],
+        "env_library_path": "HIP_PATH",
+        "env_library_subdir": "lib"
+    },
+    
+    "compiler": {
+        "executable": "hipcc",
+        "find_hint_env": "HIP_PATH",
+        "find_hint_subdir": "bin"
+    },
+    
+    "compilation": {
+        "output_extension": ".hsaco",
+        "command_template": [
+            "${COMPILER}",
+            "--genco",
+            "${TARGET_FLAGS}",
+            "-o", "${OUTPUT}",
+            "${SOURCE}"
+        ]
+    },
+    
+    "targets": {
+        "flag_prefix": "--offload-arch=",
+        "defaults": [
+            "gfx900",
+            "gfx906",
+            "gfx908",
+            "gfx90a",
+            "gfx940",
+            "gfx941",
+            "gfx942",
+            "gfx1030",
+            "gfx1100"
+        ]
+    }
+}
+
