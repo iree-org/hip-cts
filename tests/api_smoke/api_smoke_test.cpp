@@ -205,6 +205,36 @@ TEST_CASE_METHOD(HipTestFixture, "Default stream (nullptr) operations", "[stream
     REQUIRE(hip().hipFree(d_ptr) == hipSuccess);
 }
 
+TEST_CASE_METHOD(HipTestFixture, "hipGetStreamDeviceId", "[stream]") {
+    // Skip if the function is not available
+    if (!hip().hipGetStreamDeviceId) {
+        SKIP("hipGetStreamDeviceId not available");
+    }
+
+    SECTION("Default stream returns current device") {
+        int currentDevice = -1;
+        REQUIRE(hip().hipGetDevice(&currentDevice) == hipSuccess);
+        
+        int streamDeviceId = hip().hipGetStreamDeviceId(nullptr);
+        REQUIRE(streamDeviceId >= 0);
+        REQUIRE(streamDeviceId == currentDevice);
+    }
+
+    SECTION("Explicit stream returns correct device") {
+        hipStream_t stream = nullptr;
+        REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+        
+        int currentDevice = -1;
+        REQUIRE(hip().hipGetDevice(&currentDevice) == hipSuccess);
+        
+        int streamDeviceId = hip().hipGetStreamDeviceId(stream);
+        REQUIRE(streamDeviceId >= 0);
+        REQUIRE(streamDeviceId == currentDevice);
+        
+        REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+    }
+}
+
 //=============================================================================
 // Event Tests
 //=============================================================================

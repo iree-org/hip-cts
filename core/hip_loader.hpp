@@ -188,6 +188,7 @@ public:
     hipError_t (*hipStreamGetPriority)(hipStream_t stream, int* priority) = nullptr;
     hipError_t (*hipStreamAddCallback)(hipStream_t stream, hipStreamCallback_t callback,
                                         void* userData, unsigned int flags) = nullptr;
+    int (*hipGetStreamDeviceId)(hipStream_t stream) = nullptr;
 
     //=========================================================================
     // Event Management

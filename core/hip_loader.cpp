@@ -182,6 +182,7 @@ void HipLoader::loadAllSymbols() {
     tryLoadSymbol("hipStreamGetFlags", hipStreamGetFlags);
     tryLoadSymbol("hipStreamGetPriority", hipStreamGetPriority);
     tryLoadSymbol("hipStreamAddCallback", hipStreamAddCallback);
+    tryLoadSymbol("hipGetStreamDeviceId", hipGetStreamDeviceId);
 
     // Event Management - Required symbols
     loadSymbol("hipEventCreate", hipEventCreate);
