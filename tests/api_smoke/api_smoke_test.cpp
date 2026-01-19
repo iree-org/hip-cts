@@ -273,6 +273,72 @@ TEST_CASE_METHOD(HipTestFixture, "hipMemcpy2DAsync basic", "[memory][memcpy2d][a
 }
 
 //=============================================================================
+// Symbol Memory Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipGetSymbolAddress error handling", "[memory][symbol]") {
+    REQUIRE(hip().hipGetSymbolAddress != nullptr);
+
+    void* devPtr = nullptr;
+    int dummy_symbol = 0;
+
+    SECTION("Null devPtr returns error") {
+        hipError_t err = hip().hipGetSymbolAddress(nullptr, &dummy_symbol);
+        // Native HIP may return hipErrorInvalidSymbol or hipErrorInvalidValue
+        REQUIRE(err != hipSuccess);
+    }
+
+    SECTION("Null symbol returns error") {
+        hipError_t err = hip().hipGetSymbolAddress(&devPtr, nullptr);
+        REQUIRE(err != hipSuccess);
+    }
+
+    SECTION("Unregistered symbol returns error") {
+        // An unregistered symbol should return an error
+        hipError_t err = hip().hipGetSymbolAddress(&devPtr, &dummy_symbol);
+        REQUIRE(err != hipSuccess);
+    }
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMemcpyToSymbol error handling", "[memory][symbol]") {
+    REQUIRE(hip().hipMemcpyToSymbol != nullptr);
+
+    int dummy_symbol = 0;
+    int src_data = 42;
+
+    SECTION("Null symbol returns error") {
+        hipError_t err = hip().hipMemcpyToSymbol(nullptr, &src_data, sizeof(int), 0,
+                                                  hipMemcpyHostToDevice);
+        REQUIRE(err != hipSuccess);
+    }
+
+    SECTION("Null src returns error") {
+        hipError_t err = hip().hipMemcpyToSymbol(&dummy_symbol, nullptr, sizeof(int), 0,
+                                                  hipMemcpyHostToDevice);
+        REQUIRE(err != hipSuccess);
+    }
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMemcpyFromSymbol error handling", "[memory][symbol]") {
+    REQUIRE(hip().hipMemcpyFromSymbol != nullptr);
+
+    int dummy_symbol = 0;
+    int dst_data = 0;
+
+    SECTION("Null dst returns error") {
+        hipError_t err = hip().hipMemcpyFromSymbol(nullptr, &dummy_symbol, sizeof(int), 0,
+                                                    hipMemcpyDeviceToHost);
+        REQUIRE(err != hipSuccess);
+    }
+
+    SECTION("Null symbol returns error") {
+        hipError_t err = hip().hipMemcpyFromSymbol(&dst_data, nullptr, sizeof(int), 0,
+                                                    hipMemcpyDeviceToHost);
+        REQUIRE(err != hipSuccess);
+    }
+}
+
+//=============================================================================
 // Stream Tests
 //=============================================================================
 

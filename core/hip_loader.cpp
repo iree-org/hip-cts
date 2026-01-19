@@ -153,6 +153,14 @@ void HipLoader::loadAllSymbols() {
     tryLoadSymbol("hipMemcpy3D", hipMemcpy3D);
     tryLoadSymbol("hipMemcpy3DAsync", hipMemcpy3DAsync);
 
+    // Symbol Memory Operations - Optional symbols
+    tryLoadSymbol("hipGetSymbolAddress", hipGetSymbolAddress);
+    tryLoadSymbol("hipGetSymbolSize", hipGetSymbolSize);
+    tryLoadSymbol("hipMemcpyToSymbol", hipMemcpyToSymbol);
+    tryLoadSymbol("hipMemcpyToSymbolAsync", hipMemcpyToSymbolAsync);
+    tryLoadSymbol("hipMemcpyFromSymbol", hipMemcpyFromSymbol);
+    tryLoadSymbol("hipMemcpyFromSymbolAsync", hipMemcpyFromSymbolAsync);
+
     // Memory Set Operations - Required symbols
     loadSymbol("hipMemset", hipMemset);
     loadSymbol("hipMemsetAsync", hipMemsetAsync);

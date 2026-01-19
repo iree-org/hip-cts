@@ -149,6 +149,22 @@ public:
     hipError_t (*hipMemcpy3DAsync)(const hipMemcpy3DParms* p, hipStream_t stream) = nullptr;
 
     //=========================================================================
+    // Symbol Memory Operations
+    //=========================================================================
+    hipError_t (*hipGetSymbolAddress)(void** devPtr, const void* symbol) = nullptr;
+    hipError_t (*hipGetSymbolSize)(size_t* size, const void* symbol) = nullptr;
+    hipError_t (*hipMemcpyToSymbol)(const void* symbol, const void* src, size_t sizeBytes,
+                                     size_t offset, hipMemcpyKind kind) = nullptr;
+    hipError_t (*hipMemcpyToSymbolAsync)(const void* symbol, const void* src, size_t sizeBytes,
+                                          size_t offset, hipMemcpyKind kind,
+                                          hipStream_t stream) = nullptr;
+    hipError_t (*hipMemcpyFromSymbol)(void* dst, const void* symbol, size_t sizeBytes,
+                                       size_t offset, hipMemcpyKind kind) = nullptr;
+    hipError_t (*hipMemcpyFromSymbolAsync)(void* dst, const void* symbol, size_t sizeBytes,
+                                            size_t offset, hipMemcpyKind kind,
+                                            hipStream_t stream) = nullptr;
+
+    //=========================================================================
     // Memory Set Operations  
     //=========================================================================
     hipError_t (*hipMemset)(void* dst, int value, size_t sizeBytes) = nullptr;
