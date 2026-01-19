@@ -31,3 +31,9 @@ add_hip_cts_test(memory_kernel_test
         kernels/increment.hip
         kernels/vector_add.hip
 )
+
+add_hip_cts_test(memory_symbol_test
+    SOURCES symbol_test.cpp
+    KERNELS
+        kernels/symbol_test.hip
+)
