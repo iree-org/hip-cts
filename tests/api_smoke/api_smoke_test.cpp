@@ -175,6 +175,104 @@ TEST_CASE_METHOD(HipTestFixture, "hipMemset", "[memory][memset]") {
 }
 
 //=============================================================================
+// 2D Memory Copy Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipMemcpy2D basic", "[memory][memcpy2d]") {
+    REQUIRE(hip().hipMemcpy2D != nullptr);
+
+    // Create a 2D region: 4 rows x 16 bytes (4 ints) per row
+    constexpr size_t width = 16;  // bytes
+    constexpr size_t height = 4;  // rows
+    constexpr size_t h_pitch = 32;  // host pitch (larger than width)
+    constexpr size_t d_pitch = 64;  // device pitch (even larger)
+
+    // Allocate host memory with pitch
+    std::vector<uint8_t> h_src(h_pitch * height, 0);
+    std::vector<uint8_t> h_dst(h_pitch * height, 0);
+
+    // Fill source with pattern: row i has value i+1 in the first 'width' bytes
+    for (size_t row = 0; row < height; ++row) {
+        for (size_t col = 0; col < width; ++col) {
+            h_src[row * h_pitch + col] = static_cast<uint8_t>(row + 1);
+        }
+    }
+
+    // Allocate device memory with larger pitch
+    void* d_ptr = nullptr;
+    REQUIRE(hip().hipMalloc(&d_ptr, d_pitch * height) == hipSuccess);
+    REQUIRE(d_ptr != nullptr);
+
+    SECTION("Host to Device to Host round-trip") {
+        // Copy H2D
+        REQUIRE(hip().hipMemcpy2D(d_ptr, d_pitch, h_src.data(), h_pitch,
+                                   width, height, hipMemcpyHostToDevice) == hipSuccess);
+
+        // Copy D2H
+        REQUIRE(hip().hipMemcpy2D(h_dst.data(), h_pitch, d_ptr, d_pitch,
+                                   width, height, hipMemcpyDeviceToHost) == hipSuccess);
+
+        // Verify data
+        for (size_t row = 0; row < height; ++row) {
+            for (size_t col = 0; col < width; ++col) {
+                REQUIRE(h_dst[row * h_pitch + col] == static_cast<uint8_t>(row + 1));
+            }
+        }
+    }
+
+    REQUIRE(hip().hipFree(d_ptr) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMemcpy2DAsync basic", "[memory][memcpy2d][async]") {
+    REQUIRE(hip().hipMemcpy2DAsync != nullptr);
+
+    constexpr size_t width = 16;
+    constexpr size_t height = 4;
+    constexpr size_t h_pitch = 32;
+    constexpr size_t d_pitch = 64;
+
+    std::vector<uint8_t> h_src(h_pitch * height, 0);
+    std::vector<uint8_t> h_dst(h_pitch * height, 0);
+
+    for (size_t row = 0; row < height; ++row) {
+        for (size_t col = 0; col < width; ++col) {
+            h_src[row * h_pitch + col] = static_cast<uint8_t>(row + 10);
+        }
+    }
+
+    void* d_ptr = nullptr;
+    REQUIRE(hip().hipMalloc(&d_ptr, d_pitch * height) == hipSuccess);
+
+    hipStream_t stream = nullptr;
+    REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+
+    SECTION("Async Host to Device to Host") {
+        // Async copy H2D
+        REQUIRE(hip().hipMemcpy2DAsync(d_ptr, d_pitch, h_src.data(), h_pitch,
+                                        width, height, hipMemcpyHostToDevice,
+                                        stream) == hipSuccess);
+
+        // Async copy D2H
+        REQUIRE(hip().hipMemcpy2DAsync(h_dst.data(), h_pitch, d_ptr, d_pitch,
+                                        width, height, hipMemcpyDeviceToHost,
+                                        stream) == hipSuccess);
+
+        // Synchronize
+        REQUIRE(hip().hipStreamSynchronize(stream) == hipSuccess);
+
+        // Verify data
+        for (size_t row = 0; row < height; ++row) {
+            for (size_t col = 0; col < width; ++col) {
+                REQUIRE(h_dst[row * h_pitch + col] == static_cast<uint8_t>(row + 10));
+            }
+        }
+    }
+
+    REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+    REQUIRE(hip().hipFree(d_ptr) == hipSuccess);
+}
+
+//=============================================================================
 // Stream Tests
 //=============================================================================
 
