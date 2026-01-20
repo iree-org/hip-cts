@@ -82,6 +82,8 @@ public:
     hipError_t (*hipPeekAtLastError)() = nullptr;
     const char* (*hipGetErrorName)(hipError_t hip_error) = nullptr;
     const char* (*hipGetErrorString)(hipError_t hip_error) = nullptr;
+    hipError_t (*hipDrvGetErrorString)(hipError_t hipError, const char** errorString) = nullptr;
+    hipError_t (*hipDrvGetErrorName)(hipError_t hipError, const char** errorName) = nullptr;
 
     //=========================================================================
     // Memory Management
@@ -147,6 +149,15 @@ public:
                                         size_t height, hipMemcpyKind kind) = nullptr;
     hipError_t (*hipMemcpy3D)(const hipMemcpy3DParms* p) = nullptr;
     hipError_t (*hipMemcpy3DAsync)(const hipMemcpy3DParms* p, hipStream_t stream) = nullptr;
+
+    //=========================================================================
+    // Peer-to-Peer Memory Operations
+    //=========================================================================
+    hipError_t (*hipMemcpyPeer)(void* dst, int dstDeviceId, const void* src,
+                                 int srcDeviceId, size_t sizeBytes) = nullptr;
+    hipError_t (*hipMemcpyPeerAsync)(void* dst, int dstDeviceId, const void* src,
+                                      int srcDeviceId, size_t sizeBytes,
+                                      hipStream_t stream) = nullptr;
 
     //=========================================================================
     // Symbol Memory Operations

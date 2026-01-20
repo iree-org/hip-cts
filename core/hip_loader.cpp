@@ -108,6 +108,8 @@ void HipLoader::loadAllSymbols() {
     loadSymbol("hipPeekAtLastError", hipPeekAtLastError);
     loadSymbol("hipGetErrorName", hipGetErrorName);
     loadSymbol("hipGetErrorString", hipGetErrorString);
+    tryLoadSymbol("hipDrvGetErrorString", hipDrvGetErrorString);
+    tryLoadSymbol("hipDrvGetErrorName", hipDrvGetErrorName);
 
     // Memory Management - Required symbols
     loadSymbol("hipMalloc", hipMalloc);
@@ -152,6 +154,10 @@ void HipLoader::loadAllSymbols() {
     tryLoadSymbol("hipMemcpy2DFromArray", hipMemcpy2DFromArray);
     tryLoadSymbol("hipMemcpy3D", hipMemcpy3D);
     tryLoadSymbol("hipMemcpy3DAsync", hipMemcpy3DAsync);
+
+    // Peer-to-Peer Memory Operations
+    tryLoadSymbol("hipMemcpyPeer", hipMemcpyPeer);
+    tryLoadSymbol("hipMemcpyPeerAsync", hipMemcpyPeerAsync);
 
     // Symbol Memory Operations - Optional symbols
     tryLoadSymbol("hipGetSymbolAddress", hipGetSymbolAddress);

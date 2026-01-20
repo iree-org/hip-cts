@@ -273,6 +273,22 @@ TEST_CASE_METHOD(HipTestFixture, "hipMemcpy2DAsync basic", "[memory][memcpy2d][a
 }
 
 //=============================================================================
+// Peer-to-Peer Memory Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipMemcpyPeerAsync symbol exists", "[memory][peer]") {
+    // Test that the symbol exists - it may return hipErrorNotSupported
+    // if peer operations aren't implemented
+    REQUIRE(hip().hipMemcpyPeerAsync != nullptr);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMemcpyPeer symbol exists", "[memory][peer]") {
+    // Test that the symbol exists - it may return hipErrorNotSupported
+    // if peer operations aren't implemented
+    REQUIRE(hip().hipMemcpyPeer != nullptr);
+}
+
+//=============================================================================
 // Symbol Memory Tests
 //=============================================================================
 
