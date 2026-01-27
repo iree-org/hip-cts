@@ -4,11 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Test subdirectories
-add_subdirectory(api_smoke)
-add_subdirectory(kernel_smoke)
-add_subdirectory(memory)
-add_subdirectory(stream)
-add_subdirectory(event)
-add_subdirectory(device)
-add_subdirectory(error)
+add_hip_cts_test(error_test
+    SOURCES error_test.cpp
+)
