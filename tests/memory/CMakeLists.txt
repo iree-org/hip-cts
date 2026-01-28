@@ -41,3 +41,7 @@ add_hip_cts_test(memory_symbol_test
 add_hip_cts_test(memory_2d_test
     SOURCES memory_2d_test.cpp
 )
+
+add_hip_cts_test(memory_pointer_test
+    SOURCES pointer_test.cpp
+)

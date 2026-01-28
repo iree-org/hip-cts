@@ -23,3 +23,15 @@ add_hip_cts_test(kernel_atomics_test
     KERNELS
         kernels/atomics.hip
 )
+
+add_hip_cts_test(kernel_occupancy_test
+    SOURCES occupancy_test.cpp
+    KERNELS
+        kernels/occupancy.hip
+)
+
+add_hip_cts_test(kernel_function_test
+    SOURCES function_test.cpp
+    KERNELS
+        kernels/function.hip
+)

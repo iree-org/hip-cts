@@ -7,3 +7,7 @@
 add_hip_cts_test(device_test
     SOURCES device_test.cpp
 )
+
+add_hip_cts_test(device_context_test
+    SOURCES context_test.cpp
+)
