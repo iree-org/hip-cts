@@ -37,3 +37,7 @@ add_hip_cts_test(memory_symbol_test
     KERNELS
         kernels/symbol_test.hip
 )
+
+add_hip_cts_test(memory_2d_test
+    SOURCES memory_2d_test.cpp
+)

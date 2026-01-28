@@ -6,6 +6,7 @@
 
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -17,6 +18,10 @@ static std::string g_hip_library_path;
 // Global variable to store the selected HIP device (set from command line)
 // Used by HipTestFixture to set the device before each test
 int g_hip_device = 0;
+
+// Global variable to indicate if we're using the streaming backend
+// Used by tests to skip certain tests that require thread-safety
+bool g_is_streaming_backend = false;
 
 int main(int argc, char* argv[]) {
     Catch::Session session;
@@ -50,6 +55,17 @@ int main(int argc, char* argv[]) {
         } else {
             std::cout << "HIP CTS: Using HIP library: " << g_hip_library_path << "\n";
             HipLoader::setLibraryPath(g_hip_library_path);
+            
+            // Detect streaming backend based on library path
+            if (g_hip_library_path.find("streaming") != std::string::npos) {
+                g_is_streaming_backend = true;
+            }
+        }
+        
+        // Also detect streaming backend via environment variable
+        const char* iree_driver = std::getenv("IREE_HAL_DRIVER");
+        if (iree_driver != nullptr) {
+            g_is_streaming_backend = true;
         }
         
         // Access the singleton to trigger initialization (thread-safe)

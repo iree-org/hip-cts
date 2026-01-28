@@ -11,3 +11,15 @@ add_hip_cts_test(kernel_smoke_test
         kernels/vector_scale.hip
         kernels/memset_kernel.hip
 )
+
+add_hip_cts_test(kernel_shared_memory_test
+    SOURCES shared_memory_test.cpp
+    KERNELS
+        kernels/shared_memory.hip
+)
+
+add_hip_cts_test(kernel_atomics_test
+    SOURCES atomics_test.cpp
+    KERNELS
+        kernels/atomics.hip
+)

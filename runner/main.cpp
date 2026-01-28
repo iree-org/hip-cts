@@ -27,6 +27,7 @@ void printUsage(const char* program_name) {
     std::cerr << "  -d, --directory DIR       Directory to discover tests in\n";
     std::cerr << "  --hip-library PATH        Path to HIP library to use for tests\n";
     std::cerr << "  -f, --filter PATTERN      Filter tests by name pattern\n";
+    std::cerr << "  -r, --repeat N            Repeat all tests N times (default: 1)\n";
     std::cerr << "  -v, --verbose             Enable verbose output\n";
     std::cerr << "  --show-passed             Show individual passed tests in text output\n";
     std::cerr << "\n";
@@ -51,6 +52,7 @@ struct Options {
     std::string test_directory;
     std::string hip_library;
     std::string filter;
+    int repeat = 1;
     bool verbose = false;
     bool show_passed = false;
     bool use_color = true;
@@ -101,6 +103,21 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.filter = argv[++i];
+        } else if (arg == "-r" || arg == "--repeat") {
+            if (i + 1 >= argc) {
+                std::cerr << "Error: " << arg << " requires an argument\n";
+                return false;
+            }
+            try {
+                opts.repeat = std::stoi(argv[++i]);
+                if (opts.repeat < 1) {
+                    std::cerr << "Error: --repeat must be at least 1\n";
+                    return false;
+                }
+            } catch (const std::exception&) {
+                std::cerr << "Error: --repeat requires a valid integer\n";
+                return false;
+            }
         } else if (arg == "-v" || arg == "--verbose") {
             opts.verbose = true;
         } else if (arg == "--show-passed") {
@@ -203,8 +220,30 @@ int main(int argc, char* argv[]) {
         });
     }
     
-    // Run all tests
-    auto results = runner.runAllTests();
+    // Run all tests (with optional repeat)
+    hip_cts::runner::AggregatedResults results;
+    for (int iteration = 0; iteration < opts.repeat; ++iteration) {
+        if (opts.repeat > 1) {
+            if (opts.use_color) {
+                std::cout << "\033[1;35m";
+            }
+            std::cout << "\n=== Iteration " << (iteration + 1) << " of " << opts.repeat << " ===\n";
+            if (opts.use_color) {
+                std::cout << "\033[0m";
+            }
+        }
+        
+        results = runner.runAllTests();
+        
+        // Stop early if there are failures
+        if (results.total_failures > 0 || results.total_errors > 0) {
+            if (opts.repeat > 1) {
+                std::cerr << "Stopping after iteration " << (iteration + 1) 
+                          << " due to test failures.\n";
+            }
+            break;
+        }
+    }
     
     // Generate outputs
     bool output_to_console = true;

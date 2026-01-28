@@ -497,23 +497,22 @@ std::string HtmlReporter::generate(const AggregatedResults& results) {
             return results;
         }
         
-        // Extract category from suite name
+        // Extract category from suite name (prefix before first underscore)
         function extractCategory(name) {
+            // Remove _test suffix
             let category = name.replace(/_test$/, '');
+            // Get first part (the folder/category prefix)
             const idx = category.indexOf('_');
             if (idx > 0) category = category.substring(0, idx);
+            // Capitalize first letter
             category = category.charAt(0).toUpperCase() + category.slice(1);
             
-            // Map common names
-            const mapping = {
+            // Display name mappings (just formatting, not merging)
+            const displayNames = {
                 'Api': 'API',
-                'Memcpy': 'Memory',
-                'Memset': 'Memory', 
-                'Malloc': 'Memory',
-                'Host': 'Memory',
-                'Managed': 'Memory'
+                'Kernel': 'Kernels'
             };
-            return mapping[category] || category;
+            return displayNames[category] || category;
         }
         
         // Format duration
