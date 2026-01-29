@@ -64,7 +64,7 @@ TEST_CASE_METHOD(HipTestFixture, "hipMemGetAddressRange null base behavior", "[m
     hipError_t err = hip().hipMemGetAddressRange(nullptr, &size, ptr);
     // Accept either success (and size populated) or error
     if (err == hipSuccess) {
-        REQUIRE(size >= allocSize);
+    REQUIRE(size >= allocSize);
     }
 
     REQUIRE(hip().hipFree(ptr) == hipSuccess);

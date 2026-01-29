@@ -22,3 +22,6 @@ add_subdirectory(kernel_smoke)
 
 # Concurrency:
 add_subdirectory(multithread)
+
+# Graph API:
+add_subdirectory(graph)

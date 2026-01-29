@@ -263,4 +263,21 @@ void HipLoader::loadAllSymbols() {
     tryLoadSymbol("hipOccupancyMaxActiveBlocksPerMultiprocessorWithFlags",
                   hipOccupancyMaxActiveBlocksPerMultiprocessorWithFlags);
     tryLoadSymbol("hipOccupancyMaxPotentialBlockSize", hipOccupancyMaxPotentialBlockSize);
+
+    // Graph API - Optional symbols (may not be available on all implementations)
+    tryLoadSymbol("hipGraphCreate", hipGraphCreate);
+    tryLoadSymbol("hipGraphDestroy", hipGraphDestroy);
+    tryLoadSymbol("hipGraphInstantiate", hipGraphInstantiate);
+    tryLoadSymbol("hipGraphInstantiateWithFlags", hipGraphInstantiateWithFlags);
+    tryLoadSymbol("hipGraphLaunch", hipGraphLaunch);
+    tryLoadSymbol("hipGraphExecDestroy", hipGraphExecDestroy);
+    tryLoadSymbol("hipGraphAddEmptyNode", hipGraphAddEmptyNode);
+    tryLoadSymbol("hipGraphAddHostNode", hipGraphAddHostNode);
+    tryLoadSymbol("hipGraphAddMemcpyNode1D", hipGraphAddMemcpyNode1D);
+    tryLoadSymbol("hipGraphAddMemsetNode", hipGraphAddMemsetNode);
+    tryLoadSymbol("hipGraphAddDependencies", hipGraphAddDependencies);
+    tryLoadSymbol("hipGraphGetNodes", hipGraphGetNodes);
+    tryLoadSymbol("hipGraphGetRootNodes", hipGraphGetRootNodes);
+    tryLoadSymbol("hipGraphNodeGetType", hipGraphNodeGetType);
+    tryLoadSymbol("hipGraphDestroyNode", hipGraphDestroyNode);
 }

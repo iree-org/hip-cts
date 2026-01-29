@@ -311,6 +311,44 @@ public:
                                                      const void* f, size_t dynSharedMemPerBlk,
                                                      int blockSizeLimit) = nullptr;
 
+    //=========================================================================
+    // Graph API
+    //=========================================================================
+    hipError_t (*hipGraphCreate)(hipGraph_t* pGraph, unsigned int flags) = nullptr;
+    hipError_t (*hipGraphDestroy)(hipGraph_t graph) = nullptr;
+    hipError_t (*hipGraphInstantiate)(hipGraphExec_t* pGraphExec, hipGraph_t graph,
+                                       hipGraphNode_t* pErrorNode, char* pLogBuffer,
+                                       size_t bufferSize) = nullptr;
+    hipError_t (*hipGraphInstantiateWithFlags)(hipGraphExec_t* pGraphExec, hipGraph_t graph,
+                                                unsigned long long flags) = nullptr;
+    hipError_t (*hipGraphLaunch)(hipGraphExec_t graphExec, hipStream_t stream) = nullptr;
+    hipError_t (*hipGraphExecDestroy)(hipGraphExec_t graphExec) = nullptr;
+    
+    // Graph node management
+    hipError_t (*hipGraphAddEmptyNode)(hipGraphNode_t* pGraphNode, hipGraph_t graph,
+                                        const hipGraphNode_t* pDependencies,
+                                        size_t numDependencies) = nullptr;
+    hipError_t (*hipGraphAddHostNode)(hipGraphNode_t* pGraphNode, hipGraph_t graph,
+                                       const hipGraphNode_t* pDependencies,
+                                       size_t numDependencies,
+                                       const hipHostNodeParams* pNodeParams) = nullptr;
+    hipError_t (*hipGraphAddMemcpyNode1D)(hipGraphNode_t* pGraphNode, hipGraph_t graph,
+                                           const hipGraphNode_t* pDependencies,
+                                           size_t numDependencies, void* dst, const void* src,
+                                           size_t count, hipMemcpyKind kind) = nullptr;
+    hipError_t (*hipGraphAddMemsetNode)(hipGraphNode_t* pGraphNode, hipGraph_t graph,
+                                         const hipGraphNode_t* pDependencies,
+                                         size_t numDependencies,
+                                         const hipMemsetParams* pMemsetParams) = nullptr;
+    hipError_t (*hipGraphAddDependencies)(hipGraph_t graph, const hipGraphNode_t* from,
+                                           const hipGraphNode_t* to, size_t numDependencies) = nullptr;
+    hipError_t (*hipGraphGetNodes)(hipGraph_t graph, hipGraphNode_t* nodes,
+                                    size_t* numNodes) = nullptr;
+    hipError_t (*hipGraphGetRootNodes)(hipGraph_t graph, hipGraphNode_t* pRootNodes,
+                                        size_t* pNumRootNodes) = nullptr;
+    hipError_t (*hipGraphNodeGetType)(hipGraphNode_t node, hipGraphNodeType* pType) = nullptr;
+    hipError_t (*hipGraphDestroyNode)(hipGraphNode_t node) = nullptr;
+
 private:
     // Private constructor - called by instance()
     HipLoader();

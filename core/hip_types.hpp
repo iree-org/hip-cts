@@ -20,6 +20,9 @@ typedef struct ihipModule_t* hipModule_t;
 typedef struct ihipModuleSymbol_t* hipFunction_t;
 typedef void* hipDeviceptr_t;
 typedef struct ihipMemPoolHandle_t* hipMemPool_t;
+typedef struct ihipGraph* hipGraph_t;
+typedef struct ihipGraphExec* hipGraphExec_t;
+typedef struct hipGraphNode* hipGraphNode_t;
 
 typedef enum hipError_t {
     hipSuccess = 0,
@@ -576,4 +579,46 @@ typedef enum hipJitOption {
 // Texture reference (opaque)
 struct textureReference;
 
+// Graph node types
+typedef enum hipGraphNodeType {
+    hipGraphNodeTypeKernel = 0,
+    hipGraphNodeTypeMemcpy = 1,
+    hipGraphNodeTypeMemset = 2,
+    hipGraphNodeTypeHost = 3,
+    hipGraphNodeTypeGraph = 4,
+    hipGraphNodeTypeEmpty = 5,
+    hipGraphNodeTypeWaitEvent = 6,
+    hipGraphNodeTypeEventRecord = 7,
+    hipGraphNodeTypeExtSemaphoreSignal = 8,
+    hipGraphNodeTypeExtSemaphoreWait = 9,
+    hipGraphNodeTypeMemAlloc = 10,
+    hipGraphNodeTypeMemFree = 11,
+    hipGraphNodeTypeCount
+} hipGraphNodeType;
+
+// Host node parameters
+struct hipHostNodeParams {
+    hipHostFn_t fn;
+    void* userData;
+};
+
+// Memset node parameters
+struct hipMemsetParams {
+    void* dst;
+    unsigned int elementSize;
+    size_t height;
+    size_t pitch;
+    unsigned int value;
+    size_t width;
+};
+
+// Kernel node parameters
+struct hipKernelNodeParams {
+    dim3 blockDim;
+    void** extra;
+    void* func;
+    dim3 gridDim;
+    void** kernelParams;
+    unsigned int sharedMemBytes;
+};
 
