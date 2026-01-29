@@ -415,7 +415,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraph with memset node", "[graph][memset]")
         !hip().hipGraphExecDestroy || !hip().hipGraphAddMemsetNode) {
         SKIP("Graph memset API not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     constexpr size_t size = 1024;
     void* devicePtr = nullptr;
@@ -473,7 +472,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraph with memcpy node", "[graph][memcpy]")
     if (!hip().hipGraphAddMemcpyNode1D) {
         SKIP("hipGraphAddMemcpyNode1D not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     constexpr size_t size = 1024;
     void* devicePtr = nullptr;
