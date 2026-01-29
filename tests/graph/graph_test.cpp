@@ -104,7 +104,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphInstantiate empty graph", "[graph][ins
     if (!hip().hipGraphInstantiate || !hip().hipGraphExecDestroy) {
         SKIP("hipGraphInstantiate not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     hipGraph_t graph = nullptr;
     hipGraphExec_t graphExec = nullptr;
@@ -124,7 +123,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphInstantiate null pGraphExec fails", "[
     if (!hip().hipGraphInstantiate) {
         SKIP("hipGraphInstantiate not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     hipGraph_t graph = nullptr;
     REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
@@ -139,7 +137,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphInstantiate null graph fails", "[graph
     if (!hip().hipGraphInstantiate) {
         SKIP("hipGraphInstantiate not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     hipGraphExec_t graphExec = nullptr;
     REQUIRE(hip().hipGraphInstantiate(&graphExec, nullptr, nullptr, nullptr, 0) == hipErrorInvalidValue);
@@ -154,7 +151,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphLaunch empty graph", "[graph][launch]"
     if (!hip().hipGraphInstantiate || !hip().hipGraphLaunch || !hip().hipGraphExecDestroy) {
         SKIP("Graph launch API not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     hipGraph_t graph = nullptr;
     hipGraphExec_t graphExec = nullptr;
@@ -177,7 +173,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphLaunch null graphExec fails", "[graph]
     if (!hip().hipGraphLaunch) {
         SKIP("hipGraphLaunch not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     hipStream_t stream = nullptr;
     REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
@@ -192,7 +187,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphLaunch on null stream", "[graph][launc
     if (!hip().hipGraphInstantiate || !hip().hipGraphLaunch || !hip().hipGraphExecDestroy) {
         SKIP("Graph launch API not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     hipGraph_t graph = nullptr;
     hipGraphExec_t graphExec = nullptr;
@@ -582,7 +576,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraph multiple launches", "[graph][launch][
         !hip().hipGraphExecDestroy || !hip().hipGraphAddMemsetNode) {
         SKIP("Graph API not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     constexpr size_t size = 256;
     void* devicePtr = nullptr;
@@ -637,7 +630,6 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraph multiple instantiations", "[graph][in
     if (!hip().hipGraphInstantiate || !hip().hipGraphLaunch || !hip().hipGraphExecDestroy) {
         SKIP("Graph API not available");
     }
-    SKIP_ON_STREAMING_BACKEND();
     
     hipGraph_t graph = nullptr;
     constexpr int numInstances = 3;
