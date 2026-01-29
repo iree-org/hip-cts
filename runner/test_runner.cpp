@@ -9,13 +9,16 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdio>
 #include <ctime>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <regex>
 #include <sstream>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -511,6 +514,271 @@ TestSuiteResult TestRunner::runTest(const std::filesystem::path& executable) {
         std::filesystem::remove(xml_output_path);
     } else {
         // No XML output - execution may have failed
+        result.execution_failed = true;
+        result.execution_error = "Test executable did not produce XML output";
+    }
+    
+    // Use wall clock time if we don't have test time
+    if (result.time_seconds == 0.0) {
+        result.time_seconds = std::chrono::duration<double>(end - start).count();
+    }
+    
+    return result;
+}
+
+TestSuiteInfo TestRunner::enumerateTests(const std::filesystem::path& executable) {
+    TestSuiteInfo info;
+    info.name = executable.filename().string();
+    info.executable_path = executable;
+    
+    // Build command line to list tests
+    std::vector<std::string> args;
+    args.push_back(executable.string());
+    
+    // Add HIP library argument if specified
+    if (!hip_library_.empty()) {
+        args.push_back("--hip-library");
+        args.push_back(hip_library_);
+    }
+    
+    // Tell Catch2 to list tests with tags
+    args.push_back("--list-tests");
+    
+    auto exec_result = executeCommand(args);
+    
+    if (exec_result.exit_code != 0) {
+        return info;  // Return empty list on failure
+    }
+    
+    // Parse the output - Catch2 outputs tests in format:
+    // All available test cases:
+    //   TestName
+    //       [tag1][tag2]
+    //   NextTestName
+    //       [tag1]
+    // NN test cases
+    std::istringstream stream(exec_result.stdout_output);
+    std::string line;
+    TestCaseInfo current_test;
+    bool has_test = false;
+    bool in_test_list = false;
+    
+    while (std::getline(stream, line)) {
+        // Skip empty lines
+        if (line.empty()) continue;
+        
+        // Look for the start of test list
+        if (line.find("All available test cases:") != std::string::npos) {
+            in_test_list = true;
+            continue;
+        }
+        
+        // Skip lines before test list
+        if (!in_test_list) continue;
+        
+        // Check for end of test list (line like "26 test cases")
+        if (line.find(" test case") != std::string::npos) {
+            break;
+        }
+        
+        // Count leading spaces to determine if this is a test name or tags
+        size_t leading_spaces = 0;
+        for (char c : line) {
+            if (c == ' ') {
+                ++leading_spaces;
+            } else {
+                break;
+            }
+        }
+        
+        // Tags have more indentation (6+ spaces) than test names (2 spaces)
+        if (leading_spaces >= 6 && has_test) {
+            // This is a tag line
+            std::regex tag_regex(R"(\[([^\]]+)\])");
+            std::sregex_iterator iter(line.begin(), line.end(), tag_regex);
+            std::sregex_iterator end_iter;
+            for (; iter != end_iter; ++iter) {
+                current_test.tags.push_back((*iter)[1].str());
+            }
+        } else if (leading_spaces >= 2) {
+            // This is a test name - save previous test if any
+            if (has_test) {
+                info.test_cases.push_back(std::move(current_test));
+                current_test = TestCaseInfo{};
+            }
+            
+            // Trim whitespace
+            size_t start = line.find_first_not_of(" \t");
+            size_t end = line.find_last_not_of(" \t\r\n");
+            if (start != std::string::npos) {
+                current_test.name = line.substr(start, end - start + 1);
+                has_test = true;
+            }
+        }
+    }
+    
+    // Don't forget the last test
+    if (has_test) {
+        info.test_cases.push_back(std::move(current_test));
+    }
+    
+    return info;
+}
+
+std::vector<TestSuiteInfo> TestRunner::enumerateAllTests() {
+    return enumerateAllTestsParallel(1);  // Default to sequential
+}
+
+std::vector<TestSuiteInfo> TestRunner::enumerateAllTestsParallel(int num_threads) {
+    // Get test executables
+    std::vector<std::filesystem::path> tests = test_executables_;
+    
+    // Add discovered tests if we have a test directory
+    if (!test_directory_.empty()) {
+        auto discovered = discoverTests();
+        for (const auto& t : discovered) {
+            if (std::find(tests.begin(), tests.end(), t) == tests.end()) {
+                tests.push_back(t);
+            }
+        }
+    }
+    
+    if (tests.empty()) {
+        return {};
+    }
+    
+    // Limit threads to number of tests
+    num_threads = std::min(num_threads, static_cast<int>(tests.size()));
+    num_threads = std::max(1, num_threads);
+    
+    // Result storage
+    std::vector<TestSuiteInfo> all_tests(tests.size());
+    
+    if (num_threads == 1) {
+        // Sequential enumeration
+        for (size_t i = 0; i < tests.size(); ++i) {
+            all_tests[i] = enumerateTests(tests[i]);
+        }
+    } else {
+        // Parallel enumeration
+        std::atomic<size_t> next_idx{0};
+        std::mutex results_mutex;
+        std::vector<std::pair<size_t, TestSuiteInfo>> results;
+        
+        auto worker = [&]() {
+            // Create a local runner for thread safety
+            TestRunner local_runner;
+            local_runner.setHipLibrary(hip_library_);
+            
+            while (true) {
+                size_t idx = next_idx.fetch_add(1);
+                if (idx >= tests.size()) break;
+                
+                auto info = local_runner.enumerateTests(tests[idx]);
+                
+                std::lock_guard<std::mutex> lock(results_mutex);
+                results.emplace_back(idx, std::move(info));
+            }
+        };
+        
+        // Launch threads
+        std::vector<std::thread> threads;
+        for (int i = 0; i < num_threads; ++i) {
+            threads.emplace_back(worker);
+        }
+        
+        // Wait for completion
+        for (auto& t : threads) {
+            t.join();
+        }
+        
+        // Copy results to output in order
+        for (auto& [idx, info] : results) {
+            all_tests[idx] = std::move(info);
+        }
+    }
+    
+    return all_tests;
+}
+
+TestSuiteResult TestRunner::runTest(const std::filesystem::path& executable,
+                                     const std::vector<std::string>& test_names) {
+    TestSuiteResult result;
+    result.name = executable.filename().string();
+    result.executable_path = executable.string();
+    result.timestamp = getCurrentTimestamp();
+    
+    // Create temp file for XML output
+    auto xml_output_path = createTempFile("hip_cts_");
+    
+    // Build command line
+    std::vector<std::string> args;
+    args.push_back(executable.string());
+    
+    // Add HIP library argument if specified
+    if (!hip_library_.empty()) {
+        args.push_back("--hip-library");
+        args.push_back(hip_library_);
+    }
+    
+    // Add extra arguments
+    for (const auto& arg : extra_args_) {
+        args.push_back(arg);
+    }
+    
+    // Add specific test names as filter
+    if (!test_names.empty()) {
+        // Catch2 uses comma-separated test names or patterns
+        for (const auto& name : test_names) {
+            args.push_back("\"" + name + "\"");
+        }
+    }
+    
+    // Tell Catch2 to output JUnit XML
+    args.push_back("-r");
+    args.push_back("junit");
+    args.push_back("-o");
+    args.push_back(xml_output_path.string());
+    
+    // Build command line string for logging
+    std::ostringstream cmd_oss;
+    for (size_t i = 0; i < args.size(); ++i) {
+        if (i > 0) cmd_oss << " ";
+        cmd_oss << args[i];
+    }
+    result.command_line = cmd_oss.str();
+    
+    if (verbose_) {
+        std::cerr << "Running: " << result.command_line << std::endl;
+    }
+    
+    // Execute the test
+    auto start = std::chrono::steady_clock::now();
+    auto exec_result = executeCommand(args);
+    auto end = std::chrono::steady_clock::now();
+    
+    result.exit_code = exec_result.exit_code;
+    result.stdout_output = exec_result.stdout_output;
+    result.stderr_output = exec_result.stderr_output;
+    
+    // Read the XML output
+    if (std::filesystem::exists(xml_output_path)) {
+        std::ifstream xml_file(xml_output_path);
+        std::stringstream buffer;
+        buffer << xml_file.rdbuf();
+        std::string xml_content = buffer.str();
+        
+        if (!xml_content.empty()) {
+            result = parseJUnitXml(xml_content, executable);
+            result.exit_code = exec_result.exit_code;
+            result.stdout_output = exec_result.stdout_output;
+            result.stderr_output = exec_result.stderr_output;
+            result.command_line = cmd_oss.str();
+        }
+        
+        // Clean up temp file
+        std::filesystem::remove(xml_output_path);
+    } else {
         result.execution_failed = true;
         result.execution_error = "Test executable did not produce XML output";
     }

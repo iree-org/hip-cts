@@ -20,9 +20,17 @@ set(INSTALL_PROJECT OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/miniz 
                  ${CMAKE_CURRENT_BINARY_DIR}/miniz)
 
-# HIP CTS Runner executable
-add_executable(hip_cts_runner
-    main.cpp
+# Add FTXUI
+set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(FTXUI_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(FTXUI_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(FTXUI_QUIET ON CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/FTXUI 
+                 ${CMAKE_CURRENT_BINARY_DIR}/ftxui)
+
+# Shared runner library for both executables
+add_library(hip_cts_runner_lib STATIC
     test_runner.cpp
     test_runner.hpp
     xml_aggregator.cpp
@@ -33,14 +41,35 @@ add_executable(hip_cts_runner
     html_reporter.hpp
 )
 
-target_link_libraries(hip_cts_runner PRIVATE
+target_link_libraries(hip_cts_runner_lib PUBLIC
     tinyxml2
     miniz
 )
 
-target_include_directories(hip_cts_runner PRIVATE
+target_include_directories(hip_cts_runner_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# Install the runner alongside tests
-install(TARGETS hip_cts_runner DESTINATION bin)
+# HIP CTS Runner executable (CLI version)
+add_executable(hip_cts_runner
+    main.cpp
+)
+
+target_link_libraries(hip_cts_runner PRIVATE
+    hip_cts_runner_lib
+)
+
+# HIP CTS Runner executable (FTXUI interactive version)
+add_executable(hip_cts_runner_ftx
+    main_ftx.cpp
+)
+
+target_link_libraries(hip_cts_runner_ftx PRIVATE
+    hip_cts_runner_lib
+    ftxui::screen
+    ftxui::dom
+    ftxui::component
+)
+
+# Install the runners alongside tests
+install(TARGETS hip_cts_runner hip_cts_runner_ftx DESTINATION bin)

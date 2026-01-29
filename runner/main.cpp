@@ -30,6 +30,7 @@ void printUsage(const char* program_name) {
     std::cerr << "  -r, --repeat N            Repeat all tests N times (default: 1)\n";
     std::cerr << "  -v, --verbose             Enable verbose output\n";
     std::cerr << "  --show-passed             Show individual passed tests in text output\n";
+    std::cerr << "  -l, --list-tests          List all tests without running them\n";
     std::cerr << "\n";
     std::cerr << "Output Options:\n";
     std::cerr << "  -o, --output-format FMT   Output format: text, xml, html, all (default: text)\n";
@@ -46,6 +47,7 @@ void printUsage(const char* program_name) {
     std::cerr << "  " << program_name << " -d build/tests --hip-library /path/to/libhip.so\n";
     std::cerr << "  " << program_name << " build/test1 build/test2 -o html --html-output report.html\n";
     std::cerr << "  " << program_name << " -d tests -o all --xml-output results.xml --html-output results.html\n";
+    std::cerr << "  " << program_name << " -d tests --list-tests\n";
 }
 
 struct Options {
@@ -56,6 +58,7 @@ struct Options {
     bool verbose = false;
     bool show_passed = false;
     bool use_color = true;
+    bool list_tests = false;
     std::string output_format = "text";
     std::string xml_output;
     std::string html_output;
@@ -122,6 +125,8 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             opts.verbose = true;
         } else if (arg == "--show-passed") {
             opts.show_passed = true;
+        } else if (arg == "-l" || arg == "--list-tests") {
+            opts.list_tests = true;
         } else if (arg == "--no-color") {
             opts.use_color = false;
         } else if (arg == "-o" || arg == "--output-format") {
@@ -204,6 +209,45 @@ int main(int argc, char* argv[]) {
     
     for (const auto& exe : opts.test_executables) {
         runner.addTestExecutable(exe);
+    }
+    
+    // Handle --list-tests mode
+    if (opts.list_tests) {
+        auto all_tests = runner.enumerateAllTests();
+        
+        int total_tests = 0;
+        for (const auto& suite : all_tests) {
+            if (opts.use_color) {
+                std::cout << "\033[1;36m";
+            }
+            std::cout << "=== " << suite.name << " ===\n";
+            if (opts.use_color) {
+                std::cout << "\033[0m";
+            }
+            
+            for (const auto& test : suite.test_cases) {
+                std::cout << "  " << test.name;
+                if (!test.tags.empty()) {
+                    std::cout << " ";
+                    for (const auto& tag : test.tags) {
+                        if (opts.use_color) {
+                            std::cout << "\033[33m";
+                        }
+                        std::cout << "[" << tag << "]";
+                        if (opts.use_color) {
+                            std::cout << "\033[0m";
+                        }
+                    }
+                }
+                std::cout << "\n";
+                ++total_tests;
+            }
+            std::cout << "\n";
+        }
+        
+        std::cout << "Total: " << all_tests.size() << " test suites, " 
+                  << total_tests << " tests\n";
+        return 0;
     }
     
     // Set up progress callback for console output

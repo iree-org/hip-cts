@@ -7,3 +7,6 @@
 [submodule "third_party/miniz"]
 	path = third_party/miniz
 	url = https://github.com/richgel999/miniz.git
+[submodule "third_party/FTXUI"]
+	path = third_party/FTXUI
+	url = https://github.com/ArthurSonzogni/FTXUI.git

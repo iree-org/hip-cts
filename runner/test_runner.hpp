@@ -15,6 +15,20 @@
 namespace hip_cts {
 namespace runner {
 
+// Information about a single test case (for enumeration)
+struct TestCaseInfo {
+    std::string name;
+    std::string class_name;      // Test suite/fixture name
+    std::vector<std::string> tags;
+};
+
+// Information about a test suite/executable (for enumeration)
+struct TestSuiteInfo {
+    std::string name;            // Executable name
+    std::filesystem::path executable_path;
+    std::vector<TestCaseInfo> test_cases;
+};
+
 // Result of a single test case
 struct TestCaseResult {
     std::string name;
@@ -90,11 +104,22 @@ public:
     // Discover test executables in the configured directory
     std::vector<std::filesystem::path> discoverTests();
     
+    // Enumerate all tests in a single executable (without running them)
+    TestSuiteInfo enumerateTests(const std::filesystem::path& executable);
+    
+    // Enumerate all tests in all discovered/added executables
+    std::vector<TestSuiteInfo> enumerateAllTests();
+    std::vector<TestSuiteInfo> enumerateAllTestsParallel(int num_threads);
+    
     // Run all discovered/added tests
     AggregatedResults runAllTests();
     
     // Run a single test executable and return its results
     TestSuiteResult runTest(const std::filesystem::path& executable);
+    
+    // Run specific tests from a specific executable
+    TestSuiteResult runTest(const std::filesystem::path& executable, 
+                           const std::vector<std::string>& test_names);
     
 private:
     // Parse JUnit XML output from Catch2
