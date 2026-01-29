@@ -241,3 +241,121 @@ TEST_CASE_METHOD(HipTestFixture, "hipMalloc memory can be memset", "[memory][mal
     
     REQUIRE(hip().hipFree(d_ptr) == hipSuccess);
 }
+
+//=============================================================================
+// Async Memory Allocation Tests (Memory Pools)
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipMallocAsync basic allocation", "[memory][malloc][async]") {
+    hipStream_t stream = nullptr;
+    REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+    
+    void* ptr = nullptr;
+    constexpr size_t size = 1024;
+    
+    REQUIRE(hip().hipMallocAsync(&ptr, size, stream) == hipSuccess);
+    REQUIRE(ptr != nullptr);
+    
+    REQUIRE(hip().hipFreeAsync(ptr, stream) == hipSuccess);
+    REQUIRE(hip().hipStreamSynchronize(stream) == hipSuccess);
+    
+    REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMallocAsync with null pointer fails", "[memory][malloc][async][negative]") {
+    hipStream_t stream = nullptr;
+    REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+    
+    REQUIRE(hip().hipMallocAsync(nullptr, 1024, stream) == hipErrorInvalidValue);
+    
+    REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMallocAsync zero size", "[memory][malloc][async]") {
+    hipStream_t stream = nullptr;
+    REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+    
+    void* ptr = nullptr;
+    // Zero size allocation should succeed (returns nullptr or valid ptr depending on impl)
+    hipError_t err = hip().hipMallocAsync(&ptr, 0, stream);
+    REQUIRE(err == hipSuccess);
+    
+    // Free should also succeed (even if ptr is null)
+    if (ptr != nullptr) {
+        REQUIRE(hip().hipFreeAsync(ptr, stream) == hipSuccess);
+    }
+    
+    REQUIRE(hip().hipStreamSynchronize(stream) == hipSuccess);
+    REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMallocAsync multiple allocations", "[memory][malloc][async]") {
+    hipStream_t stream = nullptr;
+    REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+    
+    constexpr int numAllocs = 10;
+    constexpr size_t size = 4096;
+    std::vector<void*> ptrs(numAllocs, nullptr);
+    
+    // Allocate all
+    for (int i = 0; i < numAllocs; ++i) {
+        REQUIRE(hip().hipMallocAsync(&ptrs[i], size, stream) == hipSuccess);
+        REQUIRE(ptrs[i] != nullptr);
+    }
+    
+    // Free all
+    for (int i = 0; i < numAllocs; ++i) {
+        REQUIRE(hip().hipFreeAsync(ptrs[i], stream) == hipSuccess);
+    }
+    
+    REQUIRE(hip().hipStreamSynchronize(stream) == hipSuccess);
+    REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMallocAsync with memset and memcpy", "[memory][malloc][async]") {
+    hipStream_t stream = nullptr;
+    REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+    
+    constexpr size_t size = 1024;
+    void* d_ptr = nullptr;
+    std::vector<unsigned char> h_data(size, 0);
+    
+    REQUIRE(hip().hipMallocAsync(&d_ptr, size, stream) == hipSuccess);
+    REQUIRE(d_ptr != nullptr);
+    
+    // Memset and verify
+    REQUIRE(hip().hipMemsetAsync(d_ptr, 0xCD, size, stream) == hipSuccess);
+    REQUIRE(hip().hipStreamSynchronize(stream) == hipSuccess);
+    
+    REQUIRE(hip().hipMemcpy(h_data.data(), d_ptr, size, hipMemcpyDeviceToHost) == hipSuccess);
+    
+    for (size_t i = 0; i < size; ++i) {
+        REQUIRE(h_data[i] == 0xCD);
+    }
+    
+    REQUIRE(hip().hipFreeAsync(d_ptr, stream) == hipSuccess);
+    REQUIRE(hip().hipStreamSynchronize(stream) == hipSuccess);
+    REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipMallocAsync on null stream", "[memory][malloc][async]") {
+    void* ptr = nullptr;
+    constexpr size_t size = 1024;
+    
+    // Null stream should work (uses default stream)
+    REQUIRE(hip().hipMallocAsync(&ptr, size, nullptr) == hipSuccess);
+    REQUIRE(ptr != nullptr);
+    
+    REQUIRE(hip().hipFreeAsync(ptr, nullptr) == hipSuccess);
+    REQUIRE(hip().hipDeviceSynchronize() == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipFreeAsync with null pointer", "[memory][malloc][async]") {
+    hipStream_t stream = nullptr;
+    REQUIRE(hip().hipStreamCreate(&stream) == hipSuccess);
+    
+    // Freeing null should be a no-op (success)
+    REQUIRE(hip().hipFreeAsync(nullptr, stream) == hipSuccess);
+    
+    REQUIRE(hip().hipStreamDestroy(stream) == hipSuccess);
+}

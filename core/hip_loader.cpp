@@ -102,6 +102,29 @@ void HipLoader::loadAllSymbols() {
     tryLoadSymbol("hipChooseDevice", hipChooseDevice);
     tryLoadSymbol("hipDeviceGetPCIBusId", hipDeviceGetPCIBusId);
     tryLoadSymbol("hipDeviceGetByPCIBusId", hipDeviceGetByPCIBusId);
+    
+    // Additional device management
+    tryLoadSymbol("hipDeviceGet", hipDeviceGet);
+    tryLoadSymbol("hipDeviceGetName", hipDeviceGetName);
+    tryLoadSymbol("hipDeviceTotalMem", hipDeviceTotalMem);
+    tryLoadSymbol("hipDeviceGetStreamPriorityRange", hipDeviceGetStreamPriorityRange);
+    
+    // Primary context management
+    tryLoadSymbol("hipDevicePrimaryCtxRetain", hipDevicePrimaryCtxRetain);
+    tryLoadSymbol("hipDevicePrimaryCtxRelease", hipDevicePrimaryCtxRelease);
+    tryLoadSymbol("hipDevicePrimaryCtxReset", hipDevicePrimaryCtxReset);
+    tryLoadSymbol("hipDevicePrimaryCtxSetFlags", hipDevicePrimaryCtxSetFlags);
+    tryLoadSymbol("hipDevicePrimaryCtxGetState", hipDevicePrimaryCtxGetState);
+    
+    // Context management
+    tryLoadSymbol("hipCtxCreate", hipCtxCreate);
+    tryLoadSymbol("hipCtxDestroy", hipCtxDestroy);
+    tryLoadSymbol("hipCtxGetCurrent", hipCtxGetCurrent);
+    tryLoadSymbol("hipCtxSetCurrent", hipCtxSetCurrent);
+    tryLoadSymbol("hipCtxPushCurrent", hipCtxPushCurrent);
+    tryLoadSymbol("hipCtxPopCurrent", hipCtxPopCurrent);
+    tryLoadSymbol("hipCtxGetDevice", hipCtxGetDevice);
+    tryLoadSymbol("hipCtxSynchronize", hipCtxSynchronize);
 
     // Error Handling - Required symbols
     loadSymbol("hipGetLastError", hipGetLastError);
@@ -129,6 +152,11 @@ void HipLoader::loadAllSymbols() {
     tryLoadSymbol("hipHostRegister", hipHostRegister);
     tryLoadSymbol("hipHostUnregister", hipHostUnregister);
     tryLoadSymbol("hipMallocManaged", hipMallocManaged);
+    
+    // Async memory allocation (memory pools)
+    tryLoadSymbol("hipMallocAsync", hipMallocAsync);
+    tryLoadSymbol("hipFreeAsync", hipFreeAsync);
+    tryLoadSymbol("hipMallocFromPoolAsync", hipMallocFromPoolAsync);
     tryLoadSymbol("hipMemPrefetchAsync", hipMemPrefetchAsync);
     tryLoadSymbol("hipMemAdvise", hipMemAdvise);
     tryLoadSymbol("hipMemRangeGetAttribute", hipMemRangeGetAttribute);

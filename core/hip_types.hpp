@@ -19,6 +19,7 @@ typedef struct ihipEvent_t* hipEvent_t;
 typedef struct ihipModule_t* hipModule_t;
 typedef struct ihipModuleSymbol_t* hipFunction_t;
 typedef void* hipDeviceptr_t;
+typedef struct ihipMemPoolHandle_t* hipMemPool_t;
 
 typedef enum hipError_t {
     hipSuccess = 0,

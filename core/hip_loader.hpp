@@ -74,6 +74,29 @@ public:
     hipError_t (*hipChooseDevice)(int* device, const hipDeviceProp_t* prop) = nullptr;
     hipError_t (*hipDeviceGetPCIBusId)(char* pciBusId, int len, int device) = nullptr;
     hipError_t (*hipDeviceGetByPCIBusId)(int* device, const char* pciBusId) = nullptr;
+    
+    // Additional device management
+    hipError_t (*hipDeviceGet)(int* device, int ordinal) = nullptr;
+    hipError_t (*hipDeviceGetName)(char* name, int len, int device) = nullptr;
+    hipError_t (*hipDeviceTotalMem)(size_t* bytes, int device) = nullptr;
+    hipError_t (*hipDeviceGetStreamPriorityRange)(int* leastPriority, int* greatestPriority) = nullptr;
+    
+    // Primary context management
+    hipError_t (*hipDevicePrimaryCtxRetain)(hipCtx_t* pctx, int device) = nullptr;
+    hipError_t (*hipDevicePrimaryCtxRelease)(int device) = nullptr;
+    hipError_t (*hipDevicePrimaryCtxReset)(int device) = nullptr;
+    hipError_t (*hipDevicePrimaryCtxSetFlags)(int device, unsigned int flags) = nullptr;
+    hipError_t (*hipDevicePrimaryCtxGetState)(int device, unsigned int* flags, int* active) = nullptr;
+    
+    // Context management
+    hipError_t (*hipCtxCreate)(hipCtx_t* ctx, unsigned int flags, int device) = nullptr;
+    hipError_t (*hipCtxDestroy)(hipCtx_t ctx) = nullptr;
+    hipError_t (*hipCtxGetCurrent)(hipCtx_t* ctx) = nullptr;
+    hipError_t (*hipCtxSetCurrent)(hipCtx_t ctx) = nullptr;
+    hipError_t (*hipCtxPushCurrent)(hipCtx_t ctx) = nullptr;
+    hipError_t (*hipCtxPopCurrent)(hipCtx_t* ctx) = nullptr;
+    hipError_t (*hipCtxGetDevice)(int* device) = nullptr;
+    hipError_t (*hipCtxSynchronize)() = nullptr;
 
     //=========================================================================
     // Error Handling
@@ -103,6 +126,11 @@ public:
     hipError_t (*hipHostRegister)(void* hostPtr, size_t sizeBytes, unsigned int flags) = nullptr;
     hipError_t (*hipHostUnregister)(void* hostPtr) = nullptr;
     hipError_t (*hipMallocManaged)(void** dev_ptr, size_t size, unsigned int flags) = nullptr;
+    
+    // Async memory allocation (memory pools)
+    hipError_t (*hipMallocAsync)(void** ptr, size_t size, hipStream_t stream) = nullptr;
+    hipError_t (*hipFreeAsync)(void* ptr, hipStream_t stream) = nullptr;
+    hipError_t (*hipMallocFromPoolAsync)(void** ptr, size_t size, hipMemPool_t memPool, hipStream_t stream) = nullptr;
     hipError_t (*hipMemPrefetchAsync)(const void* dev_ptr, size_t count, int device, 
                                        hipStream_t stream) = nullptr;
     hipError_t (*hipMemAdvise)(const void* dev_ptr, size_t count, hipMemoryAdvise advice, 

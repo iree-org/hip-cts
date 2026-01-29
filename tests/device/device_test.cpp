@@ -313,3 +313,261 @@ TEST_CASE_METHOD(HipTestFixture, "hipInit with flags 0", "[device][init]") {
     // hipInit(0) should succeed
     REQUIRE(hip().hipInit(0) == hipSuccess);
 }
+
+//=============================================================================
+// hipDeviceGet Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceGet basic", "[device][get]") {
+    int device = -1;
+    REQUIRE(hip().hipDeviceGet(&device, 0) == hipSuccess);
+    REQUIRE(device == 0);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceGet invalid ordinal", "[device][get][negative]") {
+    int deviceCount = 0;
+    REQUIRE(hip().hipGetDeviceCount(&deviceCount) == hipSuccess);
+    
+    int device = -1;
+    REQUIRE(hip().hipDeviceGet(&device, deviceCount + 100) == hipErrorInvalidDevice);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceGet null pointer", "[device][get][negative]") {
+    REQUIRE(hip().hipDeviceGet(nullptr, 0) == hipErrorInvalidValue);
+}
+
+//=============================================================================
+// hipDeviceGetName Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceGetName basic", "[device][name]") {
+    char name[256] = {0};
+    REQUIRE(hip().hipDeviceGetName(name, sizeof(name), 0) == hipSuccess);
+    REQUIRE(name[0] != '\0');  // Name should not be empty
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceGetName null pointer", "[device][name][negative]") {
+    REQUIRE(hip().hipDeviceGetName(nullptr, 256, 0) == hipErrorInvalidValue);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceGetName invalid device", "[device][name][negative]") {
+    int deviceCount = 0;
+    REQUIRE(hip().hipGetDeviceCount(&deviceCount) == hipSuccess);
+    
+    char name[256] = {0};
+    hipError_t err = hip().hipDeviceGetName(name, sizeof(name), deviceCount + 100);
+    REQUIRE((err == hipErrorInvalidDevice || err == hipErrorInvalidValue));
+}
+
+//=============================================================================
+// hipDeviceTotalMem Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceTotalMem basic", "[device][totalmem]") {
+    size_t bytes = 0;
+    REQUIRE(hip().hipDeviceTotalMem(&bytes, 0) == hipSuccess);
+    REQUIRE(bytes > 0);  // Device should have some memory
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceTotalMem null pointer", "[device][totalmem][negative]") {
+    REQUIRE(hip().hipDeviceTotalMem(nullptr, 0) == hipErrorInvalidValue);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceTotalMem invalid device", "[device][totalmem][negative]") {
+    int deviceCount = 0;
+    REQUIRE(hip().hipGetDeviceCount(&deviceCount) == hipSuccess);
+    
+    size_t bytes = 0;
+    hipError_t err = hip().hipDeviceTotalMem(&bytes, deviceCount + 100);
+    REQUIRE((err == hipErrorInvalidDevice || err == hipErrorInvalidValue));
+}
+
+//=============================================================================
+// hipDeviceGetStreamPriorityRange Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceGetStreamPriorityRange basic", "[device][priority]") {
+    int leastPriority = 0;
+    int greatestPriority = 0;
+    REQUIRE(hip().hipDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority) == hipSuccess);
+    // leastPriority should be >= greatestPriority (lower number = higher priority in HIP)
+    REQUIRE(leastPriority >= greatestPriority);
+}
+
+//=============================================================================
+// Primary Context Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipDevicePrimaryCtxRetain and Release", "[device][primaryctx]") {
+    hipCtx_t ctx = nullptr;
+    REQUIRE(hip().hipDevicePrimaryCtxRetain(&ctx, 0) == hipSuccess);
+    REQUIRE(ctx != nullptr);
+    
+    REQUIRE(hip().hipDevicePrimaryCtxRelease(0) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDevicePrimaryCtxGetState", "[device][primaryctx]") {
+    unsigned int flags = 0;
+    int active = -1;
+    REQUIRE(hip().hipDevicePrimaryCtxGetState(0, &flags, &active) == hipSuccess);
+    // active should be 0 or 1
+    REQUIRE((active == 0 || active == 1));
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDevicePrimaryCtxReset", "[device][primaryctx]") {
+    // First retain to ensure context exists
+    hipCtx_t ctx = nullptr;
+    REQUIRE(hip().hipDevicePrimaryCtxRetain(&ctx, 0) == hipSuccess);
+    
+    // Reset the context
+    REQUIRE(hip().hipDevicePrimaryCtxReset(0) == hipSuccess);
+    
+    // Release - may return hipErrorInvalidContext after reset on some implementations
+    hipError_t err = hip().hipDevicePrimaryCtxRelease(0);
+    REQUIRE((err == hipSuccess || err == hipErrorInvalidContext));
+}
+
+//=============================================================================
+// Context Management Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipCtxGetCurrent", "[device][context]") {
+    hipCtx_t ctx = nullptr;
+    REQUIRE(hip().hipCtxGetCurrent(&ctx) == hipSuccess);
+    // Context may be null if none is set
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipCtxGetDevice", "[device][context]") {
+    int device = -1;
+    // This should work if there's a current context
+    hipError_t err = hip().hipCtxGetDevice(&device);
+    // Accept either success or no context error
+    REQUIRE((err == hipSuccess || err == hipErrorInvalidContext));
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipCtxSynchronize with work", "[device][context]") {
+    // Do some work first to ensure there's a context
+    void* ptr = nullptr;
+    REQUIRE(hip().hipMalloc(&ptr, 1024) == hipSuccess);
+    REQUIRE(hip().hipMemset(ptr, 0, 1024) == hipSuccess);
+    
+    // Now synchronize should succeed
+    // Note: Some HIP implementations return errors if no driver context is active
+    hipError_t err = hip().hipCtxSynchronize();
+    if (err != hipSuccess) {
+        hip().hipFree(ptr);
+        SKIP("hipCtxSynchronize returns error " << err << " on this platform");
+    }
+    
+    REQUIRE(hip().hipFree(ptr) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipCtxCreate and Destroy", "[device][context]") {
+    hipCtx_t ctx = nullptr;
+    REQUIRE(hip().hipCtxCreate(&ctx, 0, 0) == hipSuccess);
+    REQUIRE(ctx != nullptr);
+    
+    REQUIRE(hip().hipCtxDestroy(ctx) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipCtxPush and Pop", "[device][context]") {
+    // Create a context
+    hipCtx_t ctx = nullptr;
+    REQUIRE(hip().hipCtxCreate(&ctx, 0, 0) == hipSuccess);
+    
+    // Push it
+    REQUIRE(hip().hipCtxPushCurrent(ctx) == hipSuccess);
+    
+    // Pop it
+    hipCtx_t poppedCtx = nullptr;
+    REQUIRE(hip().hipCtxPopCurrent(&poppedCtx) == hipSuccess);
+    REQUIRE(poppedCtx == ctx);
+    
+    REQUIRE(hip().hipCtxDestroy(ctx) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipCtxSetCurrent", "[device][context]") {
+    // Create a context
+    hipCtx_t ctx = nullptr;
+    REQUIRE(hip().hipCtxCreate(&ctx, 0, 0) == hipSuccess);
+    
+    // Set it as current
+    REQUIRE(hip().hipCtxSetCurrent(ctx) == hipSuccess);
+    
+    // Verify it's current
+    hipCtx_t currentCtx = nullptr;
+    REQUIRE(hip().hipCtxGetCurrent(&currentCtx) == hipSuccess);
+    REQUIRE(currentCtx == ctx);
+    
+    REQUIRE(hip().hipCtxDestroy(ctx) == hipSuccess);
+}
+
+//=============================================================================
+// Device Flags Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipGetDeviceFlags basic", "[device][flags]") {
+    unsigned int flags = 0;
+    REQUIRE(hip().hipGetDeviceFlags(&flags) == hipSuccess);
+    // Flags should be a valid value (no error)
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipGetDeviceFlags null pointer fails", "[device][flags][negative]") {
+    REQUIRE(hip().hipGetDeviceFlags(nullptr) == hipErrorInvalidValue);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipSetDeviceFlags with zero", "[device][flags]") {
+    // Setting default flags (0) should work
+    // Note: This must be called before any HIP runtime API on a device
+    // For this test, we just verify the function doesn't crash
+    hipError_t err = hip().hipSetDeviceFlags(0);
+    // May succeed or fail depending on device state
+    REQUIRE((err == hipSuccess || err == hipErrorSetOnActiveProcess));
+}
+
+//=============================================================================
+// Device Peer Access Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceCanAccessPeer same device", "[device][peer]") {
+    int canAccess = -1;
+    // A device can always access itself
+    REQUIRE(hip().hipDeviceCanAccessPeer(&canAccess, 0, 0) == hipSuccess);
+    // Result depends on implementation - may be 0 or 1
+    REQUIRE((canAccess == 0 || canAccess == 1));
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceCanAccessPeer null pointer fails", "[device][peer][negative]") {
+    REQUIRE(hip().hipDeviceCanAccessPeer(nullptr, 0, 0) == hipErrorInvalidValue);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceCanAccessPeer invalid device", "[device][peer][negative]") {
+    int deviceCount = 0;
+    REQUIRE(hip().hipGetDeviceCount(&deviceCount) == hipSuccess);
+    
+    int canAccess = -1;
+    hipError_t err = hip().hipDeviceCanAccessPeer(&canAccess, deviceCount + 100, 0);
+    REQUIRE((err == hipErrorInvalidDevice || err == hipErrorInvalidValue));
+}
+
+//=============================================================================
+// Device Reset Tests  
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipDeviceReset after allocation", "[device][reset]") {
+    // Do some work
+    void* ptr = nullptr;
+    REQUIRE(hip().hipMalloc(&ptr, 1024) == hipSuccess);
+    REQUIRE(hip().hipMemset(ptr, 0, 1024) == hipSuccess);
+    
+    // Free before reset
+    REQUIRE(hip().hipFree(ptr) == hipSuccess);
+    
+    // Reset should succeed
+    REQUIRE(hip().hipDeviceReset() == hipSuccess);
+    
+    // After reset, device should still be usable
+    void* ptr2 = nullptr;
+    REQUIRE(hip().hipMalloc(&ptr2, 1024) == hipSuccess);
+    REQUIRE(hip().hipFree(ptr2) == hipSuccess);
+}
