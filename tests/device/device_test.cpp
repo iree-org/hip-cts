@@ -571,3 +571,41 @@ TEST_CASE_METHOD(HipTestFixture, "hipDeviceReset after allocation", "[device][re
     REQUIRE(hip().hipMalloc(&ptr2, 1024) == hipSuccess);
     REQUIRE(hip().hipFree(ptr2) == hipSuccess);
 }
+
+//=============================================================================
+// Regression repro: an allocation on a non-default device ordinal must be usable
+//=============================================================================
+// Touch device 0, then hipMalloc + hipMemset on a second device. Native ROCm
+// passes. The HRX (streaming) binding regressed here: the process-global
+// contiguous allocation pool, created/registered under device 0's context on the
+// first touch, was reused for the second device, so hipMemset on the second
+// device returned hipErrorNotFound (500). Reproduces on stock hrx-system main;
+// resolved by both the per-device-pool redesign and the global-pool
+// owning-context tracking in #46 (this test does not distinguish the two).
+TEST_CASE_METHOD(HipTestFixture,
+                 "hipMalloc+hipMemset on a non-default device ordinal",
+                 "[device][memory][multidevice][repro]") {
+    int deviceCount = 0;
+    REQUIRE(hip().hipGetDeviceCount(&deviceCount) == hipSuccess);
+    if (deviceCount < 2) {
+        SKIP("requires >= 2 GPUs to exercise non-default ordinals");
+    }
+
+    constexpr size_t kSize = 4096;
+    for (int dev : {0, deviceCount - 1}) {
+        REQUIRE(hip().hipSetDevice(dev) == hipSuccess);
+        void* p = nullptr;
+        REQUIRE(hip().hipMalloc(&p, kSize) == hipSuccess);
+        hipError_t err = hip().hipMemset(p, 0xAB, kSize);
+        INFO("device " << dev << ": hipMemset returned " << err << " ("
+                       << hip().hipGetErrorString(err) << ")");
+        REQUIRE(err == hipSuccess);
+        std::vector<unsigned char> host(kSize, 0);
+        REQUIRE(hip().hipMemcpy(host.data(), p, kSize, hipMemcpyDeviceToHost) ==
+                hipSuccess);
+        REQUIRE(host[0] == 0xAB);
+        REQUIRE(host[kSize - 1] == 0xAB);
+        REQUIRE(hip().hipFree(p) == hipSuccess);
+    }
+    REQUIRE(hip().hipSetDevice(g_hip_device) == hipSuccess);
+}
