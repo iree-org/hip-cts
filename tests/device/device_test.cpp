@@ -609,3 +609,31 @@ TEST_CASE_METHOD(HipTestFixture,
     }
     REQUIRE(hip().hipSetDevice(g_hip_device) == hipSuccess);
 }
+
+//=============================================================================
+// Regression repro: hipGetDevice must echo a non-default hipSetDevice ordinal
+//=============================================================================
+// hipSetDevice(N) then hipGetDevice must return N. The HRX (streaming) binding
+// regressed here: init assigned each device entry's ordinal and then a memset
+// in initialize_device zeroed it, so every device reported ordinal 0. Since
+// hipGetDevice returns context->device_ordinal (== device_entry->ordinal), any
+// non-default device read back as 0. This is the init.c ordinal-aliasing bug in
+// isolation; it is independent of the allocation pool (the cross-device pool
+// repro above can be masked by pool-owner tracking, this cannot). Native ROCm
+// passes; fixed by assigning the ordinal after the memset.
+TEST_CASE_METHOD(HipTestFixture,
+                 "hipGetDevice echoes a non-default hipSetDevice ordinal",
+                 "[device][set][get][multidevice][ordinal-id]") {
+    int deviceCount = 0;
+    REQUIRE(hip().hipGetDeviceCount(&deviceCount) == hipSuccess);
+    if (deviceCount < 2) {
+        SKIP("requires >= 2 GPUs to exercise non-default ordinals");
+    }
+    const int target = deviceCount - 1;
+    REQUIRE(hip().hipSetDevice(target) == hipSuccess);
+    int got = -1;
+    REQUIRE(hip().hipGetDevice(&got) == hipSuccess);
+    INFO("hipSetDevice(" << target << ") then hipGetDevice returned " << got);
+    REQUIRE(got == target);
+    REQUIRE(hip().hipSetDevice(g_hip_device) == hipSuccess);
+}
