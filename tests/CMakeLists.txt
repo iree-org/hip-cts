@@ -25,3 +25,6 @@ add_subdirectory(multithread)
 
 # Graph API:
 add_subdirectory(graph)
+
+# Nightly ROCm bring-up regression tests:
+add_subdirectory(event_timing)
