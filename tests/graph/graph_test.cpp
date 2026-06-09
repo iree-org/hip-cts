@@ -6,6 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <algorithm>
 #include <vector>
 #include <cstring>
 #include "hip_loader.hpp"
@@ -40,6 +41,11 @@ static bool isStreamingBackend(HipLoader& loader) {
             SKIP("Test not supported on streaming backend"); \
         } \
     } while(0)
+
+static bool containsNode(const std::vector<hipGraphNode_t>& nodes,
+                         hipGraphNode_t expected) {
+    return std::find(nodes.begin(), nodes.end(), expected) != nodes.end();
+}
 
 //=============================================================================
 // hipGraphCreate Tests
@@ -290,6 +296,80 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphAddDependencies basic", "[graph][depen
     REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
 }
 
+TEST_CASE_METHOD(HipTestFixture, "hipGraphAddDependencies validates parameter edge cases", "[graph][dependencies]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphAddEmptyNode || !hip().hipGraphAddDependencies || !hip().hipGraphGetRootNodes) {
+        SKIP("Graph dependency query API not available");
+    }
+
+    hipGraph_t graph = nullptr;
+    hipGraphNode_t node1 = nullptr;
+    hipGraphNode_t node2 = nullptr;
+    hipGraphNode_t node3 = nullptr;
+
+    REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node1, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node2, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node3, graph, nullptr, 0) == hipSuccess);
+
+    REQUIRE(hip().hipGraphAddDependencies(graph, nullptr, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddDependencies(graph, &node1, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddDependencies(graph, nullptr, &node2, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddDependencies(graph, &node1, &node1, 0) == hipSuccess);
+
+    hipGraphNode_t fromNodes[] = {node1, node2};
+    hipGraphNode_t toNodes[] = {node2, node3};
+    hipError_t err = hip().hipGraphAddDependencies(graph, fromNodes, toNodes, 2);
+    if (err == hipErrorNotSupported) {
+        hip().hipGraphDestroy(graph);
+        SKIP("hipGraphAddDependencies not fully supported");
+    }
+    REQUIRE(err == hipSuccess);
+
+    size_t numRootNodes = 0;
+    REQUIRE(hip().hipGraphGetRootNodes(graph, nullptr, &numRootNodes) == hipSuccess);
+    REQUIRE(numRootNodes == 1);
+
+    std::vector<hipGraphNode_t> rootNodes(numRootNodes);
+    REQUIRE(hip().hipGraphGetRootNodes(graph, rootNodes.data(), &numRootNodes) == hipSuccess);
+    REQUIRE(numRootNodes == 1);
+    REQUIRE(rootNodes[0] == node1);
+
+    REQUIRE(hip().hipGraphAddDependencies(graph, &node1, &node2, 1) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphAddDependencies(graph, &node1, &node1, 1) == hipErrorInvalidValue);
+
+    REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipGraphAddDependencies rejects invalid graphs and node arrays", "[graph][dependencies][negative]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphAddEmptyNode || !hip().hipGraphAddDependencies) {
+        SKIP("Graph dependency API not available");
+    }
+
+    hipGraph_t graph = nullptr;
+    hipGraph_t otherGraph = nullptr;
+    hipGraphNode_t node1 = nullptr;
+    hipGraphNode_t node2 = nullptr;
+    hipGraphNode_t otherNode = nullptr;
+
+    REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphCreate(&otherGraph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node1, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node2, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&otherNode, otherGraph, nullptr, 0) == hipSuccess);
+
+    REQUIRE(hip().hipGraphAddDependencies(nullptr, &node1, &node2, 1) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphAddDependencies(graph, nullptr, &node2, 1) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphAddDependencies(graph, &node1, nullptr, 1) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphAddDependencies(graph, nullptr, nullptr, 1) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphAddDependencies(graph, &otherNode, &node2, 1) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphAddDependencies(graph, &node1, &otherNode, 1) == hipErrorInvalidValue);
+
+    REQUIRE(hip().hipGraphDestroy(otherGraph) == hipSuccess);
+    REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
+}
+
 //=============================================================================
 // hipGraphGetNodes Tests
 //=============================================================================
@@ -339,6 +419,57 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphGetNodes with nodes", "[graph][nodes]"
     REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
 }
 
+TEST_CASE_METHOD(HipTestFixture, "hipGraphGetNodes handles buffer sizing and invalid parameters", "[graph][nodes]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphGetNodes || !hip().hipGraphAddEmptyNode) {
+        SKIP("Graph node query API not available");
+    }
+
+    hipGraph_t graph = nullptr;
+    hipGraphNode_t node1 = nullptr;
+    hipGraphNode_t node2 = nullptr;
+    hipGraphNode_t node3 = nullptr;
+
+    REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node1, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node2, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node3, graph, nullptr, 0) == hipSuccess);
+
+    size_t numNodes = 0;
+    REQUIRE(hip().hipGraphGetNodes(graph, nullptr, &numNodes) == hipSuccess);
+    REQUIRE(numNodes == 3);
+
+    std::vector<hipGraphNode_t> exactNodes(numNodes);
+    REQUIRE(hip().hipGraphGetNodes(graph, exactNodes.data(), &numNodes) == hipSuccess);
+    REQUIRE(numNodes == 3);
+    REQUIRE(containsNode(exactNodes, node1));
+    REQUIRE(containsNode(exactNodes, node2));
+    REQUIRE(containsNode(exactNodes, node3));
+
+    size_t smallCount = 2;
+    std::vector<hipGraphNode_t> smallNodes(smallCount);
+    REQUIRE(hip().hipGraphGetNodes(graph, smallNodes.data(), &smallCount) == hipSuccess);
+    REQUIRE(smallCount == 2);
+    for (hipGraphNode_t node : smallNodes) {
+        REQUIRE(containsNode(exactNodes, node));
+    }
+
+    size_t largeCount = 5;
+    std::vector<hipGraphNode_t> largeNodes(largeCount, nullptr);
+    REQUIRE(hip().hipGraphGetNodes(graph, largeNodes.data(), &largeCount) == hipSuccess);
+    REQUIRE(largeCount == 3);
+    REQUIRE(containsNode(largeNodes, node1));
+    REQUIRE(containsNode(largeNodes, node2));
+    REQUIRE(containsNode(largeNodes, node3));
+    REQUIRE(largeNodes[3] == nullptr);
+    REQUIRE(largeNodes[4] == nullptr);
+
+    REQUIRE(hip().hipGraphGetNodes(nullptr, exactNodes.data(), &numNodes) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphGetNodes(graph, exactNodes.data(), nullptr) == hipErrorInvalidValue);
+
+    REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
+}
+
 //=============================================================================
 // hipGraphGetRootNodes Tests
 //=============================================================================
@@ -376,6 +507,68 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphGetRootNodes", "[graph][nodes][root]")
     REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
 }
 
+TEST_CASE_METHOD(HipTestFixture, "hipGraphGetRootNodes handles buffer sizing and contents", "[graph][nodes][root]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphGetRootNodes || !hip().hipGraphAddEmptyNode || !hip().hipGraphAddDependencies) {
+        SKIP("Graph root node query API not available");
+    }
+
+    hipGraph_t graph = nullptr;
+    hipGraphNode_t node1 = nullptr;
+    hipGraphNode_t node2 = nullptr;
+    hipGraphNode_t node3 = nullptr;
+    hipGraphNode_t node4 = nullptr;
+
+    REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node1, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node2, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node3, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node4, graph, nullptr, 0) == hipSuccess);
+
+    hipGraphNode_t fromNodes[] = {node1, node2};
+    hipGraphNode_t toNodes[] = {node3, node3};
+    hipError_t err = hip().hipGraphAddDependencies(graph, fromNodes, toNodes, 2);
+    if (err == hipErrorNotSupported) {
+        hip().hipGraphDestroy(graph);
+        SKIP("hipGraphAddDependencies not fully supported");
+    }
+    REQUIRE(err == hipSuccess);
+
+    size_t numRootNodes = 0;
+    REQUIRE(hip().hipGraphGetRootNodes(graph, nullptr, &numRootNodes) == hipSuccess);
+    REQUIRE(numRootNodes == 3);
+
+    std::vector<hipGraphNode_t> exactRoots(numRootNodes);
+    REQUIRE(hip().hipGraphGetRootNodes(graph, exactRoots.data(), &numRootNodes) == hipSuccess);
+    REQUIRE(numRootNodes == 3);
+    REQUIRE(containsNode(exactRoots, node1));
+    REQUIRE(containsNode(exactRoots, node2));
+    REQUIRE(containsNode(exactRoots, node4));
+
+    size_t smallCount = 2;
+    std::vector<hipGraphNode_t> smallRoots(smallCount);
+    REQUIRE(hip().hipGraphGetRootNodes(graph, smallRoots.data(), &smallCount) == hipSuccess);
+    REQUIRE(smallCount == 2);
+    for (hipGraphNode_t node : smallRoots) {
+        REQUIRE(containsNode(exactRoots, node));
+    }
+
+    size_t largeCount = 5;
+    std::vector<hipGraphNode_t> largeRoots(largeCount, nullptr);
+    REQUIRE(hip().hipGraphGetRootNodes(graph, largeRoots.data(), &largeCount) == hipSuccess);
+    REQUIRE(largeCount == 3);
+    REQUIRE(containsNode(largeRoots, node1));
+    REQUIRE(containsNode(largeRoots, node2));
+    REQUIRE(containsNode(largeRoots, node4));
+    REQUIRE(largeRoots[3] == nullptr);
+    REQUIRE(largeRoots[4] == nullptr);
+
+    REQUIRE(hip().hipGraphGetRootNodes(nullptr, exactRoots.data(), &numRootNodes) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphGetRootNodes(graph, exactRoots.data(), nullptr) == hipErrorInvalidValue);
+
+    REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
+}
+
 //=============================================================================
 // hipGraphNodeGetType Tests
 //=============================================================================
@@ -396,6 +589,100 @@ TEST_CASE_METHOD(HipTestFixture, "hipGraphNodeGetType empty node", "[graph][node
     REQUIRE(hip().hipGraphNodeGetType(emptyNode, &nodeType) == hipSuccess);
     REQUIRE(nodeType == hipGraphNodeTypeEmpty);
     
+    REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipGraphNodeGetType rejects invalid parameters", "[graph][node][type][negative]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphAddEmptyNode || !hip().hipGraphNodeGetType) {
+        SKIP("Graph node type API not available");
+    }
+
+    hipGraph_t graph = nullptr;
+    hipGraphNode_t node = nullptr;
+    hipGraphNodeType nodeType = hipGraphNodeTypeCount;
+
+    REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node, graph, nullptr, 0) == hipSuccess);
+
+    REQUIRE(hip().hipGraphNodeGetType(nullptr, &nodeType) == hipErrorInvalidValue);
+    REQUIRE(hip().hipGraphNodeGetType(node, nullptr) == hipErrorInvalidValue);
+
+    REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
+}
+
+//=============================================================================
+// hipGraphDestroyNode Tests
+//=============================================================================
+
+TEST_CASE_METHOD(HipTestFixture, "hipGraphDestroyNode removes node from graph queries", "[graph][node][destroy]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphAddEmptyNode || !hip().hipGraphDestroyNode || !hip().hipGraphGetNodes) {
+        SKIP("Graph destroy node API not available");
+    }
+
+    hipGraph_t graph = nullptr;
+    hipGraphNode_t node1 = nullptr;
+    hipGraphNode_t node2 = nullptr;
+
+    REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node1, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node2, graph, nullptr, 0) == hipSuccess);
+
+    size_t numNodes = 0;
+    REQUIRE(hip().hipGraphGetNodes(graph, nullptr, &numNodes) == hipSuccess);
+    REQUIRE(numNodes == 2);
+
+    REQUIRE(hip().hipGraphDestroyNode(node1) == hipSuccess);
+
+    REQUIRE(hip().hipGraphGetNodes(graph, nullptr, &numNodes) == hipSuccess);
+    REQUIRE(numNodes == 1);
+
+    std::vector<hipGraphNode_t> nodes(numNodes);
+    REQUIRE(hip().hipGraphGetNodes(graph, nodes.data(), &numNodes) == hipSuccess);
+    REQUIRE(numNodes == 1);
+    REQUIRE(nodes[0] == node2);
+
+    REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipGraphDestroyNode rejects null node", "[graph][node][destroy][negative]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphDestroyNode) {
+        SKIP("hipGraphDestroyNode not available");
+    }
+
+    REQUIRE(hip().hipGraphDestroyNode(nullptr) == hipErrorInvalidValue);
+}
+
+TEST_CASE_METHOD(HipTestFixture, "hipGraphInstantiate supports repeated create destroy sequencing", "[graph][instantiate]") {
+    REQUIRE_GRAPH_API();
+    if (!hip().hipGraphAddEmptyNode || !hip().hipGraphInstantiate || !hip().hipGraphExecDestroy) {
+        SKIP("Graph instantiate API not available");
+    }
+
+    hipGraph_t graph = nullptr;
+    hipGraphNode_t node1 = nullptr;
+    hipGraphNode_t node2 = nullptr;
+
+    REQUIRE(hip().hipGraphCreate(&graph, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node1, graph, nullptr, 0) == hipSuccess);
+    REQUIRE(hip().hipGraphAddEmptyNode(&node2, graph, &node1, 1) == hipSuccess);
+
+    for (int i = 0; i < 5; ++i) {
+        hipGraphExec_t graphExec = nullptr;
+        REQUIRE(hip().hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0) == hipSuccess);
+        REQUIRE(graphExec != nullptr);
+        REQUIRE(hip().hipGraphExecDestroy(graphExec) == hipSuccess);
+    }
+
+    if (hip().hipGraphInstantiateWithFlags) {
+        hipGraphExec_t graphExec = nullptr;
+        REQUIRE(hip().hipGraphInstantiateWithFlags(&graphExec, graph, 0) == hipSuccess);
+        REQUIRE(graphExec != nullptr);
+        REQUIRE(hip().hipGraphExecDestroy(graphExec) == hipSuccess);
+    }
+
     REQUIRE(hip().hipGraphDestroy(graph) == hipSuccess);
 }
 
